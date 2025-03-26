@@ -24,7 +24,7 @@ FIELDS = {
     "Reinvited/ Rescheduled/ Relocated?": "field_109",
     "Controversy Explanation": "field_103",
     "Public Response": "field_108",
-    # "Read More": "field_105" #TODO: this is going to be involved
+    "Read More": "field_105"
 }
 
 
@@ -53,6 +53,15 @@ def get_detail_page(driver, id):
 
 # function that gets the field value from the html
 def get_field_value(html, field_num):
+    if field_num == "field_105":
+        pattern = r'<a class="in-cell-link" target="_blank" href="(https?://.*?)">'
+        matches = re.findall(pattern, html, re.DOTALL)
+        if matches:
+            return [url.strip() for url in matches]
+        else:
+            print(f"Error: No URLs found for field number {field_num}")
+            return []
+        
     pattern = rf'<tr class="{field_num}".*?>.*?<td class="kn-value">.*?<span.*?>(.*?)<'
     match = re.search(pattern, html, re.DOTALL)
     if match:
@@ -98,7 +107,7 @@ if __name__ == "__main__":
             detail_df = decode_detail_html(page_html, id)
             df = pd.concat([df, detail_df], ignore_index=True)
 
-        output_file = f"detail_groups\details_{i}_{top_brack}.csv"
+        output_file = f"detail_groups/details_{i}_{top_brack}.csv"
         df.to_csv(output_file, index=False)
         print(f"Saved details to {output_file}")
 
