@@ -175,4 +175,4 @@ cython_debug/
 
 
 # notebooks
-.ipynb_checkpoints/
+.ipynb

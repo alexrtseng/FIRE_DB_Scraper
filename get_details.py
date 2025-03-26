@@ -4,49 +4,73 @@ import re
 import time
 import json
 import os
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import pandas as pd
+
+FIELDS = { 
+    "Year": "field_94",
+    "School": "field_95",
+    "School Type": "field_96",
+    "Speaker/Performer/Title": "field_97",
+    "Type of Expression": "field_98",
+    "Controversy Topic(s)": "field_102",
+    "Source(s)": "field_99",
+    "Political Motives of Source(s)": "field_100",
+    "Petition For": "field_107",
+    "Petition Against": "field_106",
+    "Outcome": "field_101",
+    "Reinvited/ Rescheduled/ Relocated?": "field_109",
+    "Controversy Explanation": "field_103",
+    "Public Response": "field_108",
+    # "Read More": "field_105" #TODO: this is going to be involved
+}
 
 
 def get_detail_url(id):
     return f"https://www.thefire.org/research-learn/campus-deplatforming-database#campus-deplatforming/campus-deplatforming-details/{id}/"
 
 
-def get_detail_page(id):
+def get_detail_page(driver, id):
+    url = get_detail_url(id)
+    print(f"Getting detail page for {id} at {url}")
+    driver.get(url)
     try:
-        driver.get(get_detail_url(id))
+        # Replace 'specific-element-class-or-id' with an actual class or ID of an element that appears after loading
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "field_94"))
+        )
+        print("Page loaded successfully.")
+        html = driver.page_source
     except Exception as e:
-        print(f"failed to get detail page for {id}")
+        print("Error: Page did not load within the timeout period.", e)
+        print(f"Succesfully got detail page for {id}")
         return ""
-    time.sleep(4)
     html = driver.page_source
-    driver.delete_all_cookies()
     return html
 
 
-FIELDS = { # TODO: Luke can finish this
-    "Year": "field_94",
-    "School": "field_95",
-    "School Type": "field_96",
-    "Controversy": "field_103"
-}
-
 # function that gets the field value from the html
 def get_field_value(html, field_num):
-    pattern = rf'<td class="{field_num}.*?>.*?>(.*?)<'
+    pattern = rf'<tr class="{field_num}".*?>.*?<td class="kn-value">.*?<span.*?>(.*?)<'
     match = re.search(pattern, html, re.DOTALL)
     if match:
         return match.group(1).strip()
-    return None
+    else:
+        print(f"Error: No match found for field number {field_num}")
+        return None
+
 
 # decode the html of a detail page into a json object
-def decode_detail_html(html):
-    dict = {}
-
+def decode_detail_html(html, id):
+    # Create an empty DataFrame with columns labeled as the keys of FIELDS
+    df = pd.DataFrame()
     for field, field_num in FIELDS.items():
         value = get_field_value(html, field_num)
-        if value:
-            dict[field] = value
-    return dict
-
+        df[field] = [value]
+        df["fire_id"] = [id]
+    return df
 
 
 if __name__ == "__main__":
@@ -63,11 +87,19 @@ if __name__ == "__main__":
     print(f"Fetching details for {len(ids)} ids")
 
     # get the details for each id
-    detail_dicts = []
 
     # do this for all ids (can change num of ids)
-    for id in ids:
-        page_html = get_detail_page(id)
-        detail_dicts.append(decode_detail_html(page_html))
+    for i in range(0, len(ids), 50):
+        df = pd.DataFrame(columns=list(FIELDS.keys()) + ["fire_id"])
+        top_brack = min(i+50, len(ids))
 
-    
+        for id in ids[i:top_brack]:
+            page_html = get_detail_page(driver, id)
+            detail_df = decode_detail_html(page_html, id)
+            df = pd.concat([df, detail_df], ignore_index=True)
+
+        output_file = f"detail_groups\details_{i}_{top_brack}.csv"
+        df.to_csv(output_file, index=False)
+        print(f"Saved details to {output_file}")
+
+    driver.quit()
