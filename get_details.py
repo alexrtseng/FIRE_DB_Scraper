@@ -96,19 +96,15 @@ if __name__ == "__main__":
     print(f"Fetching details for {len(ids)} ids")
 
     # get the details for each id
+    df = pd.DataFrame(columns=list(FIELDS.keys()) + ["fire_id"])
 
-    # do this for all ids (can change num of ids)
-    for i in range(0, len(ids), 50):
-        df = pd.DataFrame(columns=list(FIELDS.keys()) + ["fire_id"])
-        top_brack = min(i+50, len(ids))
+    for id in ids:
+        page_html = get_detail_page(driver, id)
+        detail_df = decode_detail_html(page_html, id)
+        df = pd.concat([df, detail_df], ignore_index=True)
 
-        for id in ids[i:top_brack]:
-            page_html = get_detail_page(driver, id)
-            detail_df = decode_detail_html(page_html, id)
-            df = pd.concat([df, detail_df], ignore_index=True)
-
-        output_file = f"detail_groups/details_{i}_{top_brack}.csv"
-        df.to_csv(output_file, index=False)
-        print(f"Saved details to {output_file}")
+    output_file = f"big_details.csv"
+    df.to_csv(output_file, index=False)
+    print(f"Saved details to {output_file}")
 
     driver.quit()
